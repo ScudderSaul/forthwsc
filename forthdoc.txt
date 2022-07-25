@@ -1,0 +1,1021 @@
+Forth Language words  
+The Forth language version defined in the files codeelemnt.cpp and codeelement.h is a partial 
+implementation of the Forth ANSI standard. It is recommended that a copy of the ANSI standard document 
+or a good Forth text book be used to learn   Forth. This page will only list the words defined and describe 
+some differences from the standard.  
+It will also describe the way object oriented classes have been added to the implementation. 
+ 
+//+---------------------------------------------------------------------------------------+
+//The files codeelement.h and codeelement.cpp are copyright (c) 1999-2014 by Saul Scudder
+//They are distributed as freeware and no warranty is given with the use of
+//this source for any purpose whatsoever.
+//This copyright notice is to remain unmodified in the source file
+//Saul Scudder
+//358 E Whitten Ave
+//Phoenix AZ 85012
+//+---------------------------------------------------------------------------------------+
+
+Differences and bugs
+As this version of Forth defines words as c++ objects with a collection of elements that may be primitives or 
+pointers to other forth words. The concept of a "here" in a dictionary is not used. 
+Thus sequences of code like 
+
+here 4 allot
+
+must be replaced with other sequences such as
+
+create name 4 allot ;create
+
+Also this his is a lower case Forth 
+
+i.e. DUP becomes dup
+
+Some incorrect results with negative loop indices have been observed.
+Be careful of integer overflow, sizes  and bounds
+the word "evaluate" may not work as expected
+
+This version of forth is distributed as source code with minimal editing or run time support.
+ It is intended to be used to add language or scripting capacity to other programs or projects 
+and not as a stand alone forth system.
+
+Forth extensions
+Floating point support and a separate floating point stack have been implemented.
+An auilary stack has been implemented.
+Structure data types exist
+Some unique string manipulation words exist
+Memory managment has been implemented. (see the c++ source)
+Object oriented programming is supported with by Forth Classes, classes, methods, constructors, 
+destructors,inheritance and public and private are supported.   
+(see the included testclass.4th Forth source for examples of class usage) 
+
+Example :
+    class: goomb          \ declare class type
+        [dword] anw      \ declare data elements some public and some private
+        [dword] bnw
+        [dword] cnw
+public:
+         [dword] anw2
+        [dword] bnw2
+        [dword] cnw2
+
+    m: Anw@ anw @ m;       \ add methods
+    m: Anw! anw ! m;
+    m: Bnw@ bnw @ m;
+    m: Bnw! bnw ! m;
+    m: Cnw@ cnw @ m;
+    m: Cnw! cnw ! m;
+
+    m: SumAB 1 Anw! 1 Bnw! Anw@ Bnw@ + dup . Cnw! Cnw@ . cr m;
+class;                                          \finish Forth class declaration
+
+goomb pulah                            \ create a class instance named "pulah"
+pulah -: SumAB                       \ execute the method SumAB
+(decompile)-class goomb     \ decompile the class
+: umber pulah -: SumAB ;     \ compile  a method into a Forth word
+
+class: goomb2   \ declare another class type
+    [dword] mule
+    [class] goomb truel   \ this class contains a class instance
+public:
+    [dword] mule2
+    [class] goomb truel2
+m: Intrule 2 truel -: Anw! 2 truel -: Bnw! 1 mule ! m;
+m: Usetruel truel -: Anw@ truel -: Bnw@ mule @ + + . " result of goomb2 Usetrue1" printstring cr m;
+m: Intrule2 2 truel2 -: anw2 ! 2 truel2 -: bnw2 ! 1 mule2 ! m;
+m: Usetruel2 truel2 -: anw2 @ truel2 -: bnw2 @ mule2 @ + + . " result of goomb2 Usetrue12" printstring cr m;
+class;                 \ end class with class;
+
+class: hoomw public: := goomb             \ this class inherits goomb as a public child
+private:                                                        \ make them private after public: inherit
+        [dword] Adw
+        [class] goomb acl
+public:
+    m: tcn1 5 hoomw::goomb -: Anw! 
+        5 hoomw::goomb -: Bnw! 
+        5 hoomw::goomb -: Cnw! 
+        m; 
+       m: tcn2 hoomw::goomb -: Anw@ 
+            hoomw::goomb -: Bnw@ 
+            hoomw::goomb -: Cnw@ 
+            + + . cr 
+            m; 
+        m: tcn3 6 Anw! 
+            6 Bnw!        6 Cnw! 
+                m; 
+        m: tcn4 7 Anw! 
+            7 Bnw!        7 Cnw! 
+            m; 
+class;
+
+--------- FORTH Primitives Glossery -------------------------------------------------
+Format
+   Name "forth-name" ( stack-diagram ) <immediate | blank >
+        word description
+
+Defining words
+--------------
+
+colon, ":", ( <name> --- ) immediate
+     starts a forth word definition
+     example:
+        : moo 2 2 + ;
+semicolon, ";", ( -- ) immediate
+     ends a forth word definiotion
+      See : example
+constant, "constant" ( n <name> --- )
+     defines a named forth constant
+     example:
+        2 constant two
+variable, "variable" ( n <name> --- )
+     defines a named forth variable, note that the initialization 
+     values on the forth stack differs from the standard
+    example:
+        7 variable amount
+create, "create" ( <name> --- )
+     creates a named variable sized region in memory, needs an ;create or does>, 
+     this differs from the standard
+          example:
+             create home 27 allot ;create
+endcreate, ";create" ( --- )
+allot, "allot"  ( n --- )
+     allocates memory for a named forth word defined using the word create
+     See create example
+rundoes, "rundoes>", ( --- addr ) immediate
+does, "does>", ( --- addr ) immediate
+      allows appending of forth code to a word defined with create
+      example:
+         : mcre create 100 allot does> 10 + ;
+postpone, "postpone", immediate
+     <<<Not implemented properly>>> bug
+state, "state" ( ---addr )
+      a variable containing true if compiling false if executing a word
+
+Comment words
+-------------
+
+Comment, "(", ( --- ) immediate
+      Example:
+           ( this is a comment )
+CppComment, "//", ( --- )immediate
+      Example:
+           // This is a comment
+ForthComment, "\\", ( --- ) immediate
+      Example:
+          \\ This is a comment
+
+Output words
+
+quote, "\"", compiling -( cccccccc ccc "> --- ) ( runtime-( --- string ) immediate
+     example:
+         " I am a string " printstring cr 
+dotquote, ".\"", compiling-( cccccccc ccc "> --- ) runtime-( --- ) immediate
+      complies a string delimited by an ending " at runtime the string is printed
+dot, "." ( n --- )
+     prints a number from the forth stack
+udot, "u." ( u --- )
+     prints an unsigned number from the forth stack
+ddot , "d." (n n --- )
+     prints an double number from the forth stack
+dudot , "du." (u u --- )
+     prints an unsigned double number from the forth stack
+emit, "emit" ( c --- )
+    prints an ASCII char from the value on the forth stack
+nop, "nop" ( --- )
+     nop means "no operation" I.E. dies nothing
+CR, "cr" ( --- )
+    emits a carriage return
+printstring, "printstring" ( string --- )
+     prints a string  created with " 
+type, "type"  ( addr cnt --- )
+     prints a string from the address and count on the forth stack
+count, "count" ( addr --- )
+     converts a forth counted string from the address given to both address and count
+word, "word" ( c1 <cccccc><c1> --- c-addr )
+     returns the address of a forth counted string containing the word cccccc as delimited by cl
+
+Control words (those starting with "run" like runif or runbegin are generated for   internal Forth use only)
+--------------
+
+runif, "runif" ( t | f --- )
+if, "if", immediate
+     example:
+        : tst-depth depth if " Unclean stack " else " OK " then printstring cr ;  
+runelse, "runelse"
+else, "else", immediate
+     See "if" example
+runthen, "runthen"
+then, "then", immediate
+     See "if" example
+runbegin, "runbegin"
+begin, "begin", immediate
+     example:
+        : hoog 1 begin 1 + dup 10 > until " the output was " printstring  .  ;
+rununtil, "rununtil"
+until, "until", immediate
+     See begin example
+rundo, "rundo"
+do, "do", immediate
+     example:
+        : testloop 0 10 0 do 1 + dup . loop . ;
+runloop, "runloop"
+loop, "loop", immediate
+      See do example
+runiinloop, "runi"
+iinloop, "i", immediate
+      Places the inner loop index on the forth stack
+runjinloop, "runj"
+jinloop, "j", immediate
+     Places the loop index from the loop just out from the innermost 
+     loop on the forth stack
+     example:
+        : drool 5 0 do 
+            5 0 do 
+                i  j * . 
+                loop cr 
+            loop cr 
+        ;
+runleave, "runleave"
+leave, "leave", immediate
+     causes an exit from a do loop
+     example:
+       : iiiool 10 0 
+             do 
+                     i dup . 7 == 
+                     if 
+                        i . 
+                        leave 
+                     then 
+             loop 
+             cr 
+       ;
+runplusloop, "+runloop"
+plusloop, "+loop", immediate
+     like loop but the number on the forth stack is added to the loop index
+     and removed from the forth stack, when the index passes the loop limit the loop 
+     is exited.
+     Example:
+       : nooot 20 0 do i . 2 +loop cr ;
+runquestiondo, "?rundo"
+questiondo, "?do", immediate
+
+rununloop, "rununloop"
+unloop, "unloop", immediate
+     example:
+       : testule 10 0 do i . 10 0 do i dup . 5 == if unloop unloop exit then loop cr loop ;
+runwhile, "runwhile"
+while, "while", immediate
+     example:
+     : tbwr 
+         begin 3 + dup . 
+                   dup 20 < dup .
+         while dup 10 + . cr
+         repeat . cr ;
+runrepeat, "runrepeat"
+repeat, "repeat", immediate
+     See while example
+runagain, "runagain"
+again, "again", immediate
+     a begin ... again loop does not exit unless a word like exit is used inside.
+     example:
+       : testex begin 20 0 do 10 0 do j dup . 7 == if exit then loop cr loop again ;
+runcase, "runcase"
+case, "case", immediate
+     example:
+        : casetest 10 0 do i dup . 
+          case 
+           1 of i 10 + . endof
+           2 of i 10 + . endof
+           3 of i 10 + . endof
+          20 + . 
+         endcase cr
+        loop ;
+runof, "runof"
+of, "of", immediate
+     See case example
+runendof, "runendof"
+endof, "endof", immediate
+     See case example
+runendcase, "runendcase"
+endcase, "endcase", immediate
+      See case example
+runexit, "runexit", immediate
+exit, "exit", ( --- ) immediate 
+recurse, "recurse" ( --- )
+     execute the current definition from inside the current definition
+quit, "quit"
+bye, "bye" ( -- )
+     exit from forth
+
+Stack words
+------------
+
+stackdepth, "depth" ( --- n )
+     retuns the depth of the forth stack
+drop, "drop"  ( n --- )
+     removes one entry from the forth stack
+over, "over"  ( n1 n2 --- n1 n2 n1 )
+     copies the second item on the stack to the stack top
+swap, "swap"  ( n1 n2 --- n2 n1 )
+      swaps the first and second items on the forth stack
+dup, "dup"    ( n1 --- n1 n1 )
+    duplicates the top item on the forth stack
+questiondup, "?dup"  
+ duplicates the top item on the forth stack when it is not zero
+rot, "rot"  ( n1 n2 n3 --- n2 n3 n1 )
+     rotates the third item on the forth stack to the stack top 
+rpush, ">r"  ( n --- ) r:( --- n )
+     moves a number on the forth stack to the return stack
+rpop, "r>"   r:( n --- ) ( --- n )
+     moves a number on the return stack to the forth stack
+rfetch, "r@" ( --- n )
+     copies a number from the return stack to the forth stack
+nip, "nip"  ( n1 n2 --- n2 )
+     removes the number second from the top of the forth stack
+pick, "pick" ( n1 n2 ... u --- n1 n2 n3 ... n1 )
+       copies the number in the u position on the forth stack to the stack top
+tuck, "tuck" ( n1 n2 --- n2 n1 n2 )
+       copies the number on the top of the forth stack to the 3rd position on the stack
+roll, "roll" ( n n2 ... u --- n2 n3 ... n )
+        moves the number in the u position on the forth stack to the stack top
+reverserot, "-rot" ( n1 n2 n3 --- n3 n1 n2 )
+       moves the number on top of the forth stack to the third position 
+twodup, "2dup" ( n1 n2 --- n1 n2 n1 n2 )
+       duplicates the top two numbers on the forth stack
+twodrop, "2drop" ( n1 n2 --- )
+       drops the top two numbers on the forth stack
+twoswap, "2swap" ( n1 n2 n3 n4 --- n3 n4 n1 n2 )
+       swaps the top two numbers on the forth stack with the 3rd and 4th numbers
+twoover, "2over" ( n1 n2 n3 n4 --- n1 n2 n3 n4 n1 n2 )
+       copies the 3rd and 4th entries on the forth stack to the 1st and 2nd positions
+
+Auxiliary Stack Words (used to operate on the auxiliary stack)
+---------------
+
+auxpop, "aux>" a:( n --- ) ( --- n )
+     moves a number from the auxiliary stack to the forth stack
+auxpush, ">aux" ( n --- ) a:( --- n )
+ moves a number from the forth stack to the auxiliary stack
+auxswap, "auxswap" a:( n1 n2 --- n2 n1 )
+    swap for the auxiliary stack
+auxover, "auxover" a:( n1 n2 --- n1 n2 n1 )
+   over for the auxiliary stack
+auxdrop, "auxdrop" a:( n --- )
+     drop for the auxiliary stack
+auxrot, "auxrot" a:( n1 n2 n3 --- n2 n3 n1 )
+      rot for the auxiliary stack
+auxreverserot, "-auxrot" a:( n1 n2 n3 --- n3 n1 n2 )
+     -rot for the auxiliary stack
+auxfetch, "aux@" ( --- n )
+     copies the top number from the auxiliary stack to the forth stack
+auxnip, "auxnip" a:( n1 n2 --- n2 )
+     nip for the auxiliary stack
+auxpick, "auxpick" a:( n1 n2 ... u --- n1 n2 n3 ... n1 )
+     pick for the auxiliary stack
+auxtuck, "auxtuck" a:( n1 n2 --- n2 n1 n2 )
+     tuck for the auxiliary stack
+auxroll, "auxroll" a:( n n2 ... u --- n2 n3 ... n )
+     roll for the auxiliary stack
+auxtwodup, "aux2dup" a:( n1 n2 --- n1 n2 n1 n2 )
+    2dup for the auxiliary stack
+auxtwodrop, "aux2drop" a:( n1 n2 --- )
+    2drop for the auxiliary stack
+
+Address words
+--------------
+
+fetch, "@" ( addr --- n )
+      replace address on the forth stack with the value at that address
+store, "!"  ( n addr --- )
+      store the number n at the address given on the top of the forth stack
+cstore, "c!" ( c addr --- )
+      store the byte c at the address given 
+cfetch, "c@" ( addr --- c )
+      fetch the byte c from the byte address given
+wstore, "w!" ( w addr --- )
+      store the 16 bit word at the given address
+wfetch, "w@" ( addr --- w )
+      read a 16 bit word from the word address given
+plusstore, "+!" ( n addr --- )
+      add the number second on the forth stack to the value at address
+twostore, "2!" ( n1 n2 addr --- )
+      store the double number at the given address
+twofetch, "2@" ( addr --- n1 n2 )
+      fetch a double number from the given address
+
+Arithmetic and number words
+---------------------------
+
+plus, "+" ( n1 n2 --- n3 )
+    add two numbers on the forth stack
+minus, "-" ( n1 n2 --- n3 )
+     subtract the number at the forth stack top from the number 
+     second on the stack
+multiply, "*" ( n1 n2 --- n3 )
+     multiply two numbers on the forth stack
+starslash, "*/" ( n1 n2 n3 --- n4 )
+     multiply n1 times  n2 and divide the double number from the multiplication by n3 to produce n4
+starslashmod, "*/mod" ( n1 n2 n3 --- n4 n5)
+     multiply n1 times  n2 and divide the double number from the multiplication by n3 to produce n5 the quotient and n4 the remainder
+divide, "/" ( n1 n2 --- n3 )
+     divide the second number on the forth stack by the number 
+     at the top of the stack
+oneplus, "1+" ( n1 --- n2 )
+     add 1 to the number at the stack top
+oneminus, "1-" ( n1 --- n2 )
+     subtract on from the number at the stack top
+twotimes, "2*" ( n1 --- n2 )
+     multiply the number on top of the forth stack by two
+twoplus, "2+" ( n1 --- n2 )
+     add 2 to the number on top of the forth stack
+twominus, "2-" ( n1 --- n2 )
+    subtract 2 from the number on top of the forth stack
+twoslash, "2/" ( n1 --- n2 )
+    divide the number on top of the forth stack by 2
+abs, "abs" ( n1 --- n2 )
+    replace the number on top of the forth stack with it's absolute value
+and, "and" ( n1 n2 --- n3 )
+     perform a binary and between n1 and n2 to produce n3         
+not, "not" ( n1 --- n2 )
+     perform a binary not on n1 producing n2
+or, "or" ( n1 n2 --- n3 )
+     perform a binary or between n1 and n2 producing n3
+xor, "xor" ( n1 n2 --- n3 )
+     perform a binary xor between n1 and n2 producing n3
+rshift, "rshift" ( u1 u2 --- u3 )
+     shift u1 u2 bit positions right
+     example 
+        8 2 rshift 
+lshift, "lshift" ( u1 u2 --- u3 )
+    shift u1 u2 bit positions left
+invert, "invert" ( u1 --- u2 )
+     invert the buts in u1
+base, "base" ( --- addr )
+     returns the address of the current number base
+hex, "hex" ( --- )
+     set the current number base to hexadecimal
+decimal, "decimal" ( --- )
+     set the current number base  to decimal
+octal, "octal" ( --- )
+     set the current number base to octal
+fmslashmod, "fm/mod" ( n1 n2 n3 --- n3 n4 )
+     divide the double number represented by n1 and n2 by the n3 to produce the remainder n3 and the floored quotient n4 all numbers are signed
+smslashrem, "sm/rem" ( n1 n2 n3 --- n3 n4 )
+    divide the double number represented by n1 and n2 by the n3 to produce the remainder n3 and the symmetric quotient n4 all numbers are signed
+sTod, "s>d" ( n --- n1 n2 )
+     convert the singel number n to the double number n3 n4
+mtimes, "m*" ( n1 n2 --- n3 n4 )
+     n3 n4 are the double signed product of  n1 and n2
+umtimes, "um*" ( u1 u2 --- u3 u4 )
+     
+umslashmod, "um/mod" ( u1 u2 u --- q m )
+
+slashmod, "/mod" ( n1 n2 --- n3 n4 )
+      divide n1 by n2 giving the single remainder n3 and the quotient n4
+mod, "mod" ( n1 n2 --- n3 )
+     return the remainder 
+greaternumber, ">number" ( ud1 c-addr u1 --- ud2 c_addr u2 )
+     ud2 is the double unsigned result of converting the number the address c-addr  with length u1 using the current base and adding the number to the double ud1 after multiplying ud1 by base
+dplus, "d+" ( n1 n2 n3 n4 --- n5 n6 )
+    adds the two double numbers n1 n2 and n2 n3 to produce the double n5 n6
+dnegate, "dnegate" ( n1 n2 --- -[n1 n2] )
+     negate the double number n1 n2
+dzeroless, "d0<" ( n1 n2 --- t | f )
+    compare the double number n1 n2 with 0 and return true if 0 is greater
+dminus, "d-" ( n1 n2 n3 n4 --- n5 n6 )
+     subtract the double number n3 n4 from the double number n1 n2 
+dzeroequal, "d0=" ( n1 n2 --- t | f )
+     true id the double number n1 n2 is equal to 0
+dtwostar, "d2*" ( n1 n2 n3 n4 --- n5 n6 )
+    multiplys the two double numbers n1 n2 and n2 n3 to produce the double n5 n6     
+dtwoslash, "d2/" ( n1 n2 n3 n4 --- n5 n6 )
+     divide the double numbers n1 n2 by the double number n2 n3 to produce the double n5 n6
+dmax, "dmax" ( n1 n2 n3 n4 --- n1 n2 | n3 n4 )
+     return the greater of the two double numbers
+dmin, "dmin" ( n1 n2 n3 n4 --- n1 n2 | n3 n4 )
+     return the lesser of the two double numbers
+max, "max" ( n1 n2 --- n1 | n2 )
+     return the maximum of n1 or n2
+min, "min" ( n1 n2 --- n1 | n2 )
+     return the minimum of n1 or n1
+negate, "negate" ( n1 --- -n1 )
+     return the negative of n1 I.E. -n1
+hold, "hold" ( c --- )
+sign, "sign" ( n --- )
+pounds, "#s" ( --- )
+pound, "#"  ( u1 -- u2 )
+lesspound, "<#" ( --- )
+poundgreater, "#>" ( u1 --- addr cnt )
+
+Value testing  words
+--------------------
+
+lessthan, "<" ( n1 n2 --- t | f )
+     return true if n1 is less than n2
+ulessthan, "u<" ( u1 u2 --- t | f )
+     return true if the unsigned number u1 is less than the unsigned number u2
+notequal, "<>" ( n1 n2 --- t | f )
+     true if n1b is not equal to n1
+equal, "==" ( n1 n2 --- t | f )
+    true is n1 equals n2
+equal, "=" ( n1 n2 --- t | f ) // note definition of ==
+    true if n1 equals n2
+greaterthan, ">" ( n1 n2 --- t | f )
+      true if n is greater than n2
+zeroless, "0<" ( n --- t | f )
+     true if n is less than zero
+zeroequal, "0=" ( n --- t | f )
+   true if n equals zero
+zerogreater, "0>" ( n --- t | f )
+   true if n is greater than zero
+zeronot, "0<>" ( n --- t | f )
+   true if n is not equal to zero
+greaterthanequal, ">=" ( n1 n2 --- t | f )
+   true if n1 is greater or equal to n2
+lessthanequal, "<=" ( n1 n2 --- t | f )
+   true if n1 is less than or equal to n2
+within, "within" ( n1 n2 n3 --- t | f )
+      when n2 < n3 true if  n1 >= n2 and n1 < n3 
+      when n2 > n3 true if n1 >= n2  or n1 < n3
+true, "true" ( --- t )
+false, "false" ( --- f )
+
+Various string, memory and array words
+-------------------------------------
+
+stringcopy, "str=" ( &string1 &string2 ---&string1 )
+    copy a string into another string
+    example:
+     : tests1 " The rain in Spain " ;
+     : tests2 " The same in Maine " ;
+      tests1 tests2 str= printstring cr         
+stringplus, "str+" ( &string1 &string2 --- &string1 )
+     append the text of string 2 to string1
+stringequal, "str=="  ( &string1 &string2 --- t | f )
+     true if the strings are the same
+substring, "substr" ( &string1 &string2 startpos length --- &string1)
+     copy the substring in string2  at position startpos of length to string1
+stringvariable, "string" (  &string  <name> --- )
+     create a string variable initialized  to string
+stringtocstr, "str>cstr" ( &string addr --- )
+     copy the string to the cstr address addr as a zero terminated string    
+cstrtostring, "cstr>str" ( addr &string --- )
+     copy the text at the cstr address addr into the string 
+chararray, "char[]:" ( n <name> --- )
+     create a char array using the memory manager of n bytes
+chararraylen, "char[]_len" ( addr --- n )
+     get the length of a char[] at address
+deletechararray, "delchar[]" ( addr --- )
+     delete a buffer created by char[] 
+strcpy, "strcpy" ( addr1 addr2 --- )
+    copy a zero terminated string from addr2 to addr1
+strncpy, "strncpy" ( addr1 addr2 n --- )
+ copy a zero terminated string from addr2 to addr1 for n bytes maximum
+memcpy, "memcpy" ( addr1 addr2 --- )
+    copy  n bytes from addr2 to addr1
+memset, "memset" ( addr c len --- )
+     set len bytes at addr to char c
+memsize, "msize" ( addr --- u )
+    put the size alocated by the memory manager at address on the forth stack
+    addr must have previusly been alocated by the a word that uses the memory manager like char[]
+bl, "bl" ( --- bl )
+    place a blank character on the forth stack
+squote, "s"", compile-( <cccccc "> --- ) runtime-( --- addr cnt ) immediate
+     compile a string into the current word so it's address and count are returned
+     example
+         " aone s" one" type :
+cquote, "c"", compile-( <cccccc "> --- ) runtime-( --- addr ) immediate
+    compile a counted forth string into the current word being defined
+    example: 
+       : atwo c" two " count type ; 
+source, "source" ( --- addr cnt )
+     return the address and count of the current source code line being parsed
+space, "space" ( --- )
+     emit a blank char
+spaces, "spaces" ( n --- )
+    emit n spaces (blanks)
+greaterin, ">in" ( --- addr )
+
+fill, "fill" ( addr cnt c --- )
+     fill addr with cnt bytes with the value c
+move, "move" ( addr1 addr2 cnt --- )
+    move cnt bytes from addr1 to addr2
+
+Debug words
+-----------
+
+traceon, "traceon" ( --- )
+    turn on tracing
+example:
+  traceon 
+   : timm 2 ; immediate
+   : tlit timm literal 2 * . cr ;
+  tlit
+  traceoff
+    after compilation and execution of the above code the trace is in the trace file "interp<number>.txt" as
+
+----------TRACE-TURNED_ON----------
+  rdepth = 1, sdepth = 0
+ ---Exited word "traceon"  rdepth = 1, sdepth = 0
+Entered word ":"  rdepth = 1, sdepth = 0
+ ---Exited word ":"  rdepth = 1, sdepth = 0
+ Entered word ";"  rdepth = 1, sdepth = 0
+ ---Exited word ";"  rdepth = 1, sdepth = 0
+ Entered word "immediate"  rdepth = 1, sdepth = 0
+ ---Exited word "immediate"  rdepth = 1, sdepth = 0
+Entered word ":"  rdepth = 1, sdepth = 0
+ ---Exited word ":"  rdepth = 1, sdepth = 0
+ Entered word "timm"  rdepth = 1, sdepth = 0
+ ---Exited word "timm"  rdepth = 1, sdepth = 1 Stack: 2 
+ Entered word "literal"  rdepth = 1, sdepth = 1 Stack: 2 
+ ---Exited word "literal"  rdepth = 1, sdepth = 0
+ Entered word "*"  rdepth = 1, sdepth = 0
+ ---Exited word "*"  rdepth = 1, sdepth = 0
+ Entered word "."  rdepth = 1, sdepth = 0
+ ---Exited word "."  rdepth = 1, sdepth = 0
+ Entered word "cr"  rdepth = 1, sdepth = 0
+ ---Exited word "cr"  rdepth = 1, sdepth = 0
+ Entered word ";"  rdepth = 1, sdepth = 0
+ ---Exited word ";"  rdepth = 1, sdepth = 0
+Entered word "tlit"  rdepth = 1, sdepth = 0
+ Entered word "*"  rdepth = 2, sdepth = 2 Stack: 2 2 
+ ---Exited word "*"  rdepth = 2, sdepth = 1 Stack: 4 
+ Entered word "."  rdepth = 2, sdepth = 1 Stack: 4 
+ ---Exited word "."  rdepth = 2, sdepth = 0
+ Entered word "cr"  rdepth = 2, sdepth = 0
+ ---Exited word "cr"  rdepth = 2, sdepth = 0
+ ---Exited word "tlit"  rdepth = 1, sdepth = 0
+Entered word "traceoff"  rdepth = 1, sdepth = 0
+ 
+----------DONE_TRACE----------
+
+traceoff, "traceoff"  ( --- )
+   turn off tracing
+   see traceon example
+addtrace, "addtrace" ( string --- )
+  inserts a string into the trace output
+dot_s, ".s" ( --- )
+  displays the forth stack
+
+Forth structure words
+
+example: 
+\\ two structure types are defined below
+
+structure: SmallStruct
+  25 +char  Small_name
+      +long  Small_long
+structure;
+
+structure: MyStruct
+ 25              +char     My_name
+                 +long     My_long
+                 +short    My_short
+ 2               +long[]   My_both
+ 3  SmallStruct  +object[] My_small
+structure;
+
+\\ using the structure type requires creating an instance with "new-structure"
+
+MyStruct new-structure constant addr_mine 
+
+\\ access to elements in the structure is automatic 
+
+addr_mine My_long     ( --- addr of My_Long )   
+
+\\ access of arrays in the structure also needs an array index on the stack
+
+1 addr_mine My_both   ( 1 --- addr if My_both[1] ) \\ note the ( [ 1] ) 
+
+ 
+structure,           "structure:"   ( <name> -- )
+    starts structure type definition
+Nchar,               "+char"         ( n <name> --- )
+    add n chars to a structure being defined
+Nshort,              "+short"        ( <name> --- )
+    add a short (16 bits) to the structure being defined
+Nlong,               "+long"         ( <name> --- )
+  add a long (32 bits) to the structure being defined
+Narraylong,       "+long[]"       ( n <name> --- )
+  add an array of  longs (each 32 bits) to the structure being defined
+Narrayshort,      "+short[]"      ( n <name> --- )
+   add an array of  shorts (each 16 bits) to the structure being defined
+Narrayobjects,   "+object[]"    ( n <name> --- )
+  add an array of  structures  or objects of fixed size to the structure being defined
+endstructure,     "structure;"    ( --- )
+  end a structure type definition
+
+createinstance,  "new-structure"   ( size --- )
+  create a new structure type instance
+
+System call words
+-----------------
+
+ReadEntireFile, "ReadEntireFile" ( &string  --- buffer )
+    creates a memory buffer using the forth memory manager and reads the entire file into it.
+    the file must exist.
+    example
+          " myfile.txt " ReadEntireFile
+include, "include"
+  creates a memory buffer using the forth memory manager and reads the entire file into it.
+  The buffer is then pushed onto the forth input stream and parsed
+   example
+       " myfile.4th " include 
+timeanddate, "time&date"   ( --- n1 n2 n3 n4 n5 n6 )
+   The current time and date. n1 is the second {0...59}, 
+   n2 is the minute {0...59}, n3 is the hour {0...23}, 
+   n4 is the day {1...31} n5 is the month {1...12}, 
+   and n6 is the year (e.g., 1991).
+      
+find, "find" ( c-addr --- c-addr 0 | xt 1 | xt -1 )
+    from a name at address return the address and 0 if the word is not in the forth dictonary
+    the execution token and 1 if the word exists and is immediate
+    the execution token and -1 if the word exists and is not immediate
+
+Vocabulary and compile control words
+------------------------------------
+
+tic, "'" ( <forthword> --- addr )
+     place the execution address of the forth word  in the forth stack
+       example:
+         ' myforthword  ( --- xt  )
+execute, "execute" ( xt --- )
+    execute the forth word represented by the execution token on the stack
+        example:
+        ' myforthword execute
+decompile, "decompile" ( xt --- )
+        decompile the forth word represented by the executuin token on the stack
+          example:
+             : tbwr 
+                   begin 3 + dup . 
+                        dup 20 < dup .
+                  while dup 10 + . cr
+                 repeat . cr ;
+
+              ' tbwr decompile
+            // the output is
+Name: "tbwr"
+-->Element 0 is  a call to the word runbegin
+-->Element 1 is  a literal == to 3
+-->Element 2 is  a call to the word +
+-->Element 3 is  a call to the word dup
+-->Element 4 is  a call to the word .
+-->Element 5 is  a call to the word dup
+-->Element 6 is  a literal == to 20
+-->Element 7 is  a call to the word <
+-->Element 8 is  a call to the word dup
+-->Element 9 is  a call to the word .
+-->Element 10 is  a literal == to 18
+-->Element 11 is  a call to the word runwhile
+-->Element 12 is  a call to the word dup
+-->Element 13 is  a literal == to 10
+-->Element 14 is  a call to the word +
+-->Element 15 is  a call to the word .
+-->Element 16 is  a call to the word cr
+-->Element 17 is  a literal == to 0
+-->Element 18 is  a call to the word runrepeat
+-->Element 19 is  a call to the word .
+-->Element 20 is  a call to the word cr
+ --End-of-decompile----
+          
+immediate, "immediate", immediate 
+     marks the most recent word defined as immediate so it is executed when compiling
+     example:
+          : timm 2 ; immediate
+          : tlit timm literal 2 * . cr ;
+ 
+forth, "forth", ( --- ) immediate 
+       makes forth the context vocabulary 
+vocabulary, "vocabulary", ( <name> --- ) immediate
+       creates a new vocabulary with the name <name> , when <name> is executed it will become the 
+       context vocabulary
+definitions, "definitions", immediate
+       makes the context vocabulary the current vocabulary
+       example:
+          vocabulary roof immediate
+          roof definitions
+literal, "literal", immediate
+         compiles the number on the stack into the current definition so it will be pushed onto the forth stack 
+          when the definition is executed 
+vocquery, "is-in-voc" ( xt --- )
+          prints the vocabulary containing the execution token of a forth word on the stack
+          example:
+              ' peak is-in-voc cr     \\ prints roof
+leftbracket, "[", immediate      ( <forth words> )
+          when defining a word the code between [ and ] is executed immediately and not compiled
+           example:
+               :  ItsAddress    [ start_addr  12 + ] literal ;
+rightbracket, "]", ( -- ) immediate
+         see definition of [
+bracketticbracket, "[']", ( xt -- ) immediate
+        when compiling a word  compiles the execution token of another word on the forth stack into the  current definition. Used to compile immediate words into a new forth word
+release, "release" ( <name> -- )
+     Remove a vocabulary from the search list 
+evaluate, "evaluate" ( addr cnt --- )
+     attempts to parse the forth code in  the buffer at address with length cnt
+
+Char Size words
+---------------
+
+cell, "cell" ( --- cellsize )
+        returns the size  of a long  ( 4 )
+cellplus, "cell+"  ( n --- n+cellsize )
+        adds the size of a long to n
+cells, "cells" ( n --- n*cellsize)
+        returns the size of n longs
+chars, "chars" ( n --- n*charsize)
+        retunrs the size of n chars
+charplus, "char+" ( n --- n+charsize)
+        adds the size of one char to n
+bracketcharbracket, "[char]", ( <word> --- c ) immediate
+        compiles the first character of the next word in the input stream into the current definition
+char, "char"
+        pushes the first char of the next word onto the forth stack
+
+Floating point support (using separate floating point stack)
+----------------------
+
+ftimes, "f*" f:( f1 f2 --- f3)
+      f1 is multiplied by f2 and the result f3 is placed on the floating point stack
+fplus, "f+" f:( f1 f2 --- f3)
+     f1 is added to f2 and the result f3 is placed on the floating point stack
+fminus, "f-" f:( f1 f2 --- f3)
+     f2 is subtracted from f1 and the result f3 is placed on the floating point stack
+fdivide, "f/" f:( f1 f2 --- f3)
+     f1 is divided by f2 and the result f3 is placed on the floating point stack
+dtof, "d>f" ( d  --- ) f:( --- f )
+     the double number on the forth stack is converted to a float on the floating point stack
+ftod, "f>d" f:( f --- ) ( --- d )
+     The  number  on the floating point stack is converted to a double number on the forth stack
+fzeroless, "f0<"  f:( f --- ) ( --- t | f )
+       true is placed on the forth stack if f is less than 0.0
+fzeroequal, "f0=" f:( f --- ) ( --- t | f )
+      true is placed on the forth stack if f is equal to  0.0
+fless, "f<" f:( f1 f2 --- ) ( --- t | f )
+   true is placed on the forth stack if f1 is less than f2
+flessequal, "f<=" f:( f1 f2 --- ) ( --- t | f )
+   true is placed on the forth stack if f1is less than or equals f2
+fgreater, "f>" f:( f1 f2 --- ) ( --- t | f )
+   true is placed on the forth stack if f1 is greater than f2
+fgreaterequal, "f>=" f:( f1 f2 --- ) ( --- t | f )
+   true is placed on the forth stack if f1 is greater or equals f2
+fdrop, "fdrop" f:( f --- )
+   drop for the floating point stack
+fdup, "fdup" f:( f1 --- f1 f1 )
+  dup for the floating point stack
+fnip, "fnip" f:( f1 f2 --- f2 )
+   nip for the floating point stack
+froll, "froll" f:( f1 f2 --- f1 f2 f1 )
+    roll for the floating point stack
+fpick, "fpick" ( f1 f2 ... --- f1 f2 ... f1 ) ( u --- )
+    pickl for the floating point stack
+fover, "fover" ( f1 f2 f3 ... --- f2 f3 ... f1 ) ( u --- )
+    over for the floating point stack
+frot, "frot" f:( f1 f2 f3 --- f2 f3 f1 )
+    rot for the floating point stack
+freverserot, "-frot" f:( f1 f2 f3 --- f3 f1 f2 )
+    -rot for the floating point stack
+ftuck, "ftuck" f:( f1 f2 --- f2 f1 f2 )
+     tuck for the floating point stack
+fpower, "f**" f:( f1 f2 --- f3 )
+     f1 is raised to the power  f2 and the result f3 is placed on the floating point stack
+fabs, "fabs"  f:( f1 --- abs[f1] )
+    takes the absolute value of f1
+facos, "facos" f:( f1 --- acos[f1] )
+    returns the principle radian angle whose cosine is f1
+fcosh, "fcosh" f:( f1 --- cosh[f1] )
+   returns the hyperbolic cosine of f1
+fcos, "fcos" f:( f1 --- cos[f1] )
+   returns the cosine of f1
+fasin, "fasin" f:( f1 --- asin[f1] )
+   returns the principle radian angle whose sine is f1
+fsin, "fsin" f:( f1 --- sin[f1] )
+   returns the sine of f1
+fsincos, "fsincos" f:( f1 --- cos[f1] sin[f1] )
+    returns the cosine and the sine of f1
+fsinh, "fsinh" f:( f1 --- sinh[f1] )
+   returns the hyperbolic sine of f1
+fatan, "fatan" f:( f1 --- atan[f1] )
+   returns the tangent of f1
+ftan, "ftan" f:( f1 --- tan[f1] )
+   returns the tangent of f1
+ftanh, "ftanh" f:( f1 --- tanh[f1] )
+   returns the hypebolic tangent of f1
+fatan2, "fatan2"  f:( f1 f2 --- atan2[f1, f2] )
+    returns the radian angle whose tangent is f1/f2   
+fexp, "fexp" f:( f1 --- exp[f1] )
+   returns e to   the power f1
+fln, "fln"  f:( f1 --- ln[f1] )
+   returns the natural logarithm of f1
+flog, "flog"  f:( f1 --- log[f1] )
+   returns the logarithm base 10 of r1
+sqrt, "fsqrt" f:( f1 --- sqrt[f1] )
+   returns the square root of f1
+fdot, "f." ( f --- )
+   prints a floating point number
+fmin, "fmin" f:( f1 f2 --- f1 | f2 )
+  returns the minimum of f1 and f2
+fmax, "fmax" f:( f1 f2 --- f1 | f2 )
+   returns the maximum of f1 and f2
+fnegate, "fnegate" f:( f1 --- -f1 )
+  returns the negitive of f1
+
+Forth class words ( see the explanation at the beginning of this file )
+--------------------------
+
+DashRightGreater, "->", ( <method-name> --- ) immediate 
+    Used as instance-address method-name
+DashDot, "-:", immediate ( <method-name> --- )
+    Used as instance-name -: method-name
+class, "class:", immediate ( <name> --- )
+    Used as class: class-name
+This, "this" ( --- addr )
+    Used to get the address of the current class
+MethodSemicolon, "m;", ( <name> --- ) immediate
+    Ends a method definition
+MethodColon, "m:", ( --- ) immediate
+    Begins a method definition
+EnclosedByte, "[byte]", ( <name> --- ) immediate
+    Used to define a byte class member
+EnclosedBytes, "[bytes]", ( n <name> --- ) immediate
+    Used to define 'n'  bytes as a class member
+EnclosedWord, "[word]", ( <name> --- ) immediate
+    Used to define a word class member
+EnclosedWords, "[words]", ( n <name> --- ) immediate
+    Used to define 'n'  words as a class member
+EnclosedDWord, "[dword]", ( <name> --- ) immediate
+    Used to define a double word class element
+    as [dword] name
+EnclosedDWords, "[dwords]", immediate
+    Used to define 'n'  double words as a class member
+EnclosedPointer, "[pointer]", ( <name> --- ) immediate
+    Used to define a pointer class member
+EnclosedPointers, "[pointers]", ( n <name> --- ) immediate
+    Used to define 'n'  pointers as a class member
+EnclosedArrays, "[arrays]", ( n <name> --- ) immediate
+EnclosedClass, "[class]", ( <name> --- ) immediate
+    Used to define a class instance as a class member
+EnclosedClasses, "[classes]", ( n <name> --- ) immediate
+    Used to define 'n'  class instances as a class member
+endclass, "class;", immediate
+    Used to end a class definition
+publiccolon, "public:", immediate
+    Used to declare following class members public
+privatecolon, "private:", immediate
+        Used to declare following class members private
+protectedcolon, "protected:", immediate
+        Used to declare following class members potected
+DecompileClass, "(decompile)-class", ( <class-name> -- ) immediate
+    Used to decompile a class for debuging
+ColonEqual, ":=", ( <class-name> --- ) immediate
+    Used to inherit from another class
+    as class: FromToot public: := Toot
+ColonColon "::" ( --- )
+    Used to specify methods from an inherited class instance
+    As in hoomw::goomb -: Anw!
+NewClass, "new"
+    Creates a new instance of a class
+DeleteClass, "delete"
+    Deletes a class instance from memory
+
+-----------------------c++ classes in the code -----------------------------------------
+
+Language ---+
+            |
+            + InterpreterData ---+ vector < RSData  > ( return stack )
+            |                    |  
+            + Primitives         + vector < long  > dats; (forth stack )
+                                 |
+                                 + vector < long  > aux; ( aux stack )
+                                 |
+                                 + vector < double > flt; ( floating point stack )
+                                 |
+                                 + Parser ( as a pointer )
+                                 |
+                                 + Dictonary (as a pointer) ----------------+ vector<Word>
+                                 |                                           | 
+                                 + ClassDescriptions ( as a pointer ) ---+   + vector<Vocabulary>
+                                 |                                       |
+                                 + Errors ----+ ErrorData                +  map<string, ClassDescription, less<string>
+                                 |
+                                 + MemoryMung ----+ MemInstDat
+                                 |               
+                                 + NamedSTLMap
+                                 |
+                                 + NamedSTLVect
+
+ClassDescription ---+ map<string, ClassData, less<string> >objectdata;
+                    |
+                    + map<string, ClassMethod, less<string> >methods;
+
+Word ---+ vector<Element > 
+
+Element ---+ int type
+           |
+           + union ---+ Word *
+                        Primitive *  
+                        long
+                        string *
+                        ClassMethod *
+                        ClassData *
+
+---------------------------------------------------------------------------------------------

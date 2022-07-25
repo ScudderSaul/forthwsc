@@ -1,0 +1,3 @@
+</pre><hr color=blue><font color=blue> <?4th " include test success " printstring cr ?></font><font color=green> <?4th " include test in green " printstring cr ?></font>
+<font color=black>DONE includescript</font><pre>
+
