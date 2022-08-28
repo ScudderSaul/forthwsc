@@ -3,6 +3,10 @@ Windows Forth
 A web framework implementation using the 4th interpreter I wrote. It can scripts web pages like c# in MVC. It runs as an IIS or Apache cgi.
 https://dragonsawaken.net/leho/HowToUseForthForwebScripting.htm 
 
+The Forth version documentation.
+https://dragonsawaken.net/leho/Forthdocs/forth.htm
+
+
 // Copyright(c) 1999-2022 by Saul Scudder
 
 //Permission is hereby granted, free of charge, to any person obtaining a copy of this software
